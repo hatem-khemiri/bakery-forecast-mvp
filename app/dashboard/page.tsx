@@ -23,7 +23,7 @@ export default async function DashboardPage() {
     [userId, format(yesterday, 'yyyy-MM-dd')]
   );
 
-  const hasYesterdaySales = yesterdaySales.rows[0]?.count > 0;
+  const hasYesterdaySales = (yesterdaySales.rows[0] as any)?.count > 0;
 
   // Vérifier si des recommandations existent pour demain
   const tomorrowRecs = await query(
@@ -31,7 +31,7 @@ export default async function DashboardPage() {
     [userId, format(tomorrow, 'yyyy-MM-dd')]
   );
 
-  const hasTomorrowRecs = tomorrowRecs.rows[0]?.count > 0;
+  const hasTomorrowRecs = (tomorrowRecs.rows[0] as any)?.count > 0;
 
   // Nombre de produits actifs
   const productsCount = await query<Product>(
@@ -39,7 +39,7 @@ export default async function DashboardPage() {
     [userId]
   );
 
-  const totalProducts = productsCount.rows[0]?.count || 0;
+  const totalProducts = (productsCount.rows[0] as any)?.count || 0;
 
   // Dernières ventes (5 derniers jours)
   const recentSales = await query<{ sale_date: string; total: number }>(
