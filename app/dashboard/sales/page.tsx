@@ -19,23 +19,57 @@ export default function SalesPage() {
   const [date, setDate] = useState(format(subDays(new Date(), 1), 'yyyy-MM-dd'));
   const [sales, setSales] = useState<Record<number, Sale>>({});
   const [loading, setLoading] = useState(false);
+  const [existingSales, setExistingSales] = useState(false);
 
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    if (products.length > 0) {
+      loadSalesForDate();
+    }
+  }, [date, products]);
 
   const fetchProducts = async () => {
     try {
       const response = await fetch('/api/products');
       const data = await response.json();
       setProducts(data.products);
+    } catch (error) {
+      console.error('Erreur:', error);
+    }
+  };
+
+  const loadSalesForDate = async () => {
+    try {
+      const response = await fetch(`/api/sales?date=${date}`);
+      const data = await response.json();
       
-      // Initialiser les ventes à 0
-      const initialSales: Record<number, Sale> = {};
-      data.products.forEach((p: Product) => {
-        initialSales[p.id] = { productId: p.id, quantitySold: 0, quantityUnsold: 0 };
+      // Initialiser les ventes
+      const salesData: Record<number, Sale> = {};
+      let hasExistingData = false;
+
+      products.forEach((p: Product) => {
+        const existingSale = data.sales?.find((s: any) => s.product_id === p.id);
+        if (existingSale) {
+          salesData[p.id] = {
+            productId: p.id,
+            quantitySold: existingSale.quantity_sold,
+            quantityUnsold: existingSale.quantity_unsold || 0,
+          };
+          hasExistingData = true;
+        } else {
+          salesData[p.id] = {
+            productId: p.id,
+            quantitySold: 0,
+            quantityUnsold: 0,
+          };
+        }
       });
-      setSales(initialSales);
+
+      setSales(salesData);
+      setExistingSales(hasExistingData);
     } catch (error) {
       console.error('Erreur:', error);
     }
@@ -44,8 +78,9 @@ export default function SalesPage() {
   const handleSave = async () => {
     setLoading(true);
     try {
+      let saved = 0;
       for (const sale of Object.values(sales)) {
-        if (sale.quantitySold > 0) {
+        if (sale.quantitySold > 0 || sale.quantityUnsold > 0) {
           await fetch('/api/sales', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -59,9 +94,19 @@ export default function SalesPage() {
               },
             }),
           });
+          saved++;
         }
       }
-      alert('Ventes enregistrées !');
+      
+      if (saved > 0) {
+        alert(existingSales 
+          ? `${saved} vente(s) mise(s) à jour !` 
+          : `${saved} vente(s) enregistrée(s) !`
+        );
+        setExistingSales(true);
+      } else {
+        alert('Aucune vente à enregistrer');
+      }
     } catch (error) {
       console.error('Erreur:', error);
       alert('Erreur lors de l\'enregistrement');
@@ -82,6 +127,11 @@ export default function SalesPage() {
           value={date}
           onChange={(e) => setDate(e.target.value)}
         />
+        {existingSales && (
+          <p className="text-sm text-orange-600 mt-2">
+            ⚠️ Des ventes existent déjà pour cette date. Toute modification écrasera les données précédentes.
+          </p>
+        )}
       </div>
 
       {products.length === 0 ? (
@@ -143,7 +193,13 @@ export default function SalesPage() {
               disabled={loading}
               className="btn btn-primary"
             >
-              {loading ? <span className="spinner"></span> : 'Enregistrer les ventes'}
+              {loading ? (
+                <span className="spinner"></span>
+              ) : existingSales ? (
+                'Mettre à jour les ventes'
+              ) : (
+                'Enregistrer les ventes'
+              )}
             </button>
           </div>
         </div>
